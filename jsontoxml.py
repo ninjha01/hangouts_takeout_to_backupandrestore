@@ -11,11 +11,29 @@ def current_milli_time():
     return int(round(time.time() * 1000))
 
 
+# Too complicated -> recocomend splitting out into something like validate_thread
+# def is_thread_valid():
+#     check thread validity
+#     return True/False
+
+# def singlePath():
+#     if not is_thread_valid:
+#         return 0
+#     rest of method body...
+
+
 def singlePath(root, thread):
+
+    ################################################################################
+    # Validation section
+    ################################################################################
+
+    # It looks like you're assuming a pretty complex nested dictionary structure - maybe throw some asserts in? Could help with debugging
+
     participant = thread["conversation"]["conversation"]["participant_data"]
 
     if "phone_number" in participant[0].keys():
-        # number
+        # rename to phone_number?
         phone = participant[0]["phone_number"]["e164"]
         if "i18n_data" in participant[0]["phone_number"].keys():
             is_valid = participant[0]["phone_number"]["i18n_data"]["is_valid"]
@@ -44,18 +62,26 @@ def singlePath(root, thread):
     else:
         return 0
 
+    ################################################################################
+    # End validation section
+    ################################################################################
+
     message_count = 0
 
     for msg in thread["events"]:
         try:
             message_count += 1
             # Inbound/Outbound
+            # Overloading the type keyword seems dangerous -> refactor to msg_type
             type = getType(msg)
 
             # Content of the message
             text = getMessage(msg)
 
-            # has attachment
+            # refactor to
+            # has_attachment = text is None
+            # if has_attachment: continue
+
             if text is None:
                 continue
 
@@ -92,6 +118,7 @@ def singlePath(root, thread):
                 readable_date=str(date),
                 contact_name=str(name),
             )
+        # A bit confused as to why this is here
         except Exception:
             print(msg)
             raise
@@ -116,7 +143,7 @@ def groupIDs(thread):
     phone_found = False
     for participant in thread["conversation"]["conversation"][
         "participant_data"
-    ]:
+    ]:  # deeply nested dict structure freaks me out a bit again. Would throw in some asserts/helper functions to extract data modularly (if the JSON structure changes in the future)
         try:
             userID = participant["id"]["chat_id"]
             if participant.get("phone_number"):
@@ -169,6 +196,7 @@ def buildGroupConvo(root, thread, user_ids):
                 datesent = ts
             else:
                 # Sent
+                # 0 seems like a magic number, maybe set to None, or a globakl UNKNOWN_DATE var?
                 datesent = 0
 
             date = getReadableDate(ts)
@@ -187,7 +215,7 @@ def buildGroupConvo(root, thread, user_ids):
                 readable_date=str(date),
                 contact_name=str(xml_name),
                 rr="129",
-                ct_t="application/vnd.wap.multipart.related",
+                ct_t="application/vnd.wap.multipart.related",  # should put magic string in a var and document
                 seen="1",
                 text_only="1",
                 msg_box=str(type),  # SMS type
@@ -200,6 +228,7 @@ def buildGroupConvo(root, thread, user_ids):
                 # Sent
                 mms_root.set("m_type", "128")
                 # PduHeaders.RESPONSE_STATUS_OK (0x80)
+                # Put a link to documentation of these codes
                 mms_root.set("resp_st", "128")
 
             parts = ET.SubElement(mms_root, "parts")
@@ -227,6 +256,7 @@ def buildGroupConvo(root, thread, user_ids):
 
 # Assuming all messages are 1 = Received or 2 = Sent
 # Ignoring: 3 = Draft, 4 = Outbox, 5 = Failed, 6 = Queued
+# Switch to using an enum rather than magic numbers https://docs.python.org/3/library/enum.html
 def getType(msg):
     senderID = msg["sender_id"]["gaia_id"]
     userID = msg["self_event_state"]["user_id"]["gaia_id"]
@@ -252,7 +282,9 @@ def getMessage(msg):
         for attachment in message_content["attachment"]:
             types = attachment["embed_item"]["type"]
             for type in types:
-                if type == "PLUS_PHOTO":
+                if (
+                    type == "PLUS_PHOTO"
+                ):  # Use Enums here as well MessageType.PLUS_PHOTO
                     url = attachment["embed_item"]["plus_photo"]["url"]
                     # Strip unnecessary spaces
                     url = re.sub(r"\s+", "", url)
@@ -294,6 +326,7 @@ def getMessage(msg):
     return text
 
 
+# document units
 def getTimestamp(msg):
     ts = int(int(msg["timestamp"]) / 1000)
 
@@ -312,7 +345,8 @@ def getReadableDate(ts):
 
 def main():
     os.chdir(sys.path[0])
-
+    # assert this file exists and looks like you expect
+    # use https://docs.python.org/3/library/argparse.html to pass file as cmd line parameter?
     with open("Hangouts.json", encoding="utf8") as f:
         datastore = f.read()
 
@@ -321,7 +355,7 @@ def main():
     root = ET.Element(
         "smses",
         message_count=str(0),
-        backup_set="145bea68-a1f4-4068-a631-06757067e675",
+        backup_set="145bea68-a1f4-4068-a631-06757067e675",  # Magic string should be in a variable and documented
         backup_date=str(current_milli_time()),
     )
 
@@ -335,6 +369,7 @@ def main():
 
     root.set("count", str(message_count))
     tree = ET.ElementTree(root)
+    # use argparse to pass outfile as cmd line parameter?
     tree.write("Hangouts.xml")
 
 

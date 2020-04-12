@@ -28,6 +28,16 @@ $ pip3 install pre-commit
 $ pre-commit install
 ```
 
+
+[comment]: <> I highly reccommend using venvs when working with python - I really like miniconda https://docs.conda.io/en/latest/miniconda.html
+
+```
+conda create -n hangouts python=3.7
+source activate hangouts
+pip install -r requirements.txt
+pre-commit install
+```
+
 # Features
 - [x] Convert SMS messages
 - [x] Convert MMS group messages
